@@ -33,7 +33,7 @@ func main() {
 	confFile := "upyun_backup.conf"
 	conf, err = upyun.LoadConfig(confFile)
 	if err != nil {
-		fmt.Errorf("%s\n", err)
+		fmt.Println(err)
 		return
 	}
 
@@ -61,6 +61,7 @@ func main() {
 	upyun.L.Informational("User: `%s'", conf.User)
 	upyun.L.Informational("Password: `%s'", conf.Password)
 	upyun.L.Informational("Bucket: `%s'", conf.Bucket)
+	upyun.L.Informational("LocalDir: `%s'", conf.LocalDir)
 	upyun.L.Informational("Domain: `%s'", domain)
 	upyun.L.Informational("Routine: `%d'", conf.Routine)
 	upyun.L.Informational("Debug: `%v'", conf.Debug)

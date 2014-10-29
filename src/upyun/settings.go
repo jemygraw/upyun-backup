@@ -2,6 +2,8 @@ package upyun
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"github.com/astaxie/beego/logs"
 	"io/ioutil"
 	"os"
@@ -39,17 +41,17 @@ func InitLogs(jsonConfig string, debugMode bool) {
 func LoadConfig(cfgFile string) (cfg Conf, err error) {
 	cfgH, openErr := os.Open(cfgFile)
 	if openErr != nil {
-		err = openErr
+		err = errors.New(fmt.Sprintf("Open config file error: `%s'", openErr.Error()))
 		return
 	}
 	defer cfgH.Close()
 	cfgData, readErr := ioutil.ReadAll(cfgH)
 	if readErr != nil {
-		err = readErr
+		err = errors.New(fmt.Sprintf("Read config file error: `%s'", readErr.Error()))
 		return
 	}
 	if unErr := json.Unmarshal(cfgData, &cfg); unErr != nil {
-		err = unErr
+		err = errors.New(fmt.Sprintf("Parse config file error: `%s'", unErr.Error()))
 		return
 	}
 	return
