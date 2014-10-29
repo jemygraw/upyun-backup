@@ -42,8 +42,8 @@ func (this *UpyunBackup) SnapshotFiles(bucketName string, conf Conf, snapshotFil
 		this.Domain = DOMAIN_AUTO
 	}
 
-	reqDir := ""
-	reqPath := fmt.Sprintf("/%s/%s", UrlEncode(bucketName), reqDir)
+	reqDir := "/"
+	reqPath := fmt.Sprintf("/%s%s", UrlEncode(bucketName), reqDir)
 	this.getPathList(reqPath, reqDir, conf, brWriter)
 	L.Informational("Finish the snapshot of files")
 }
@@ -89,16 +89,12 @@ func (this *UpyunBackup) getPathList(reqPath string, reqDir string, conf Conf, w
 		ftype := items[1]
 		switch ftype {
 		case "F":
-			//go and read
-			reqDirX := fmt.Sprintf("%s%s", reqDir, UrlEncode(fname))
-			reqPathX := fmt.Sprintf("%s%s", reqPath, UrlEncode(fname))
+			//find more files under this dir
+			reqDirX := fmt.Sprintf("%s%s/", reqDir, UrlEncode(fname))
+			reqPathX := fmt.Sprintf("%s/%s/", reqPath, UrlEncode(fname))
 			this.getPathList(reqPathX, reqDirX, conf, writer)
 		case "N":
-			sep := "/"
-			if reqDir == "" {
-				sep = ""
-			}
-			items[0] = strings.Join([]string{reqDir, fname}, sep)
+			items[0] = strings.Join([]string{reqDir, fname}, "")
 			writer.WriteString(strings.Join(items, "\t"))
 			writer.WriteString("\n")
 		}

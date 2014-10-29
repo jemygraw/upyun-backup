@@ -20,6 +20,7 @@ type Conf struct {
 	User     string `json:"user"`
 	Password string `json:"password"`
 	Bucket   string `json:"bucket"`
+	LocalDir string `json:"localdir"`
 	Domain   int32  `json:"domain"`
 	Routine  int32  `json:"routine"`
 	Debug    bool   `json:"debug"`
