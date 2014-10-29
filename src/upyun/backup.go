@@ -89,7 +89,7 @@ func (this *UpyunBackup) getPathList(reqPath string, conf Conf, writer *bufio.Wr
 		switch ftype {
 		case "F":
 			//go and read
-			reqPath = fmt.Sprintf("%s%s/", reqPath, fname)
+			reqPath = fmt.Sprintf("%s%s/", reqPath, UrlEscape(fname))
 			this.getPathList(reqPath, conf, writer)
 		case "N":
 			items[0] = strings.Join([]string{reqPath, fname}, "")
