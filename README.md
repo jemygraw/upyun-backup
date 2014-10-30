@@ -1,6 +1,12 @@
 又拍云本地备份工具
 ============
 
+如果需要帮助：
+
+> [微博 @jemygraw](http://weibo.com/jemygraw)
+
+> [Twitter @jemygraw](https://twitter.com/jemygraw)
+
 ##简介
 本工具用来将又拍云存储上面的数据备份到本地磁盘。支持增量备份。
 

@@ -16,6 +16,9 @@ Usage:
 Commands:
 	upyun_backup snapshot snapshotFile - Make a snapshot of all the folders and files in the bucket.
 	upyun_backup backup snapshotFile - Start to backup files by the specified snapshot file.
+
+Build Version:
+  upyun_backup v1.0.20141030
 `
 	fmt.Println(helpDoc)
 }
