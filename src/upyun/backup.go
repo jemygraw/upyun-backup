@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -72,7 +73,7 @@ func (this *UpyunBackup) getPathList(reqPath string, reqDir string, conf Conf, w
 	req.Header("Date", reqDate)
 	resp, respErr := req.Response()
 	if respErr != nil {
-		L.Error("Get path `%s' files response failed due to `%s'", reqPath, respErr)
+		L.Error("Get path `%s' files response failed due to `%s'", reqPath, respErr.Error())
 		return
 	}
 	respData, readErr := ioutil.ReadAll(resp.Body)
@@ -108,7 +109,7 @@ func (this *UpyunBackup) getPathList(reqPath string, reqDir string, conf Conf, w
 func (this *UpyunBackup) BackupFiles(conf Conf, snapshotFile string) {
 	spFile, readErr := os.Open(snapshotFile)
 	if readErr != nil {
-		L.Error("Read snapshot file error due to `%s'", readErr)
+		L.Error("Read snapshot file error due to `%s'", readErr.Error())
 		return
 	}
 	defer spFile.Close()
@@ -126,6 +127,13 @@ func (this *UpyunBackup) BackupFiles(conf Conf, snapshotFile string) {
 
 		}
 		fpath := items[0]
+		var fsize int64 = 0
+		var pErr error
+		fsize, pErr = strconv.ParseInt(items[2], 10, 64)
+		if pErr != nil {
+			L.Error("Cannot parse file size for `%s'", fpath)
+			continue
+		}
 		if !strings.HasPrefix(fpath, "/") {
 			L.Error("Must specify the path, which starts with a `/', for file `%s'", fpath)
 			continue
@@ -137,7 +145,7 @@ func (this *UpyunBackup) BackupFiles(conf Conf, snapshotFile string) {
 			curR := atomic.LoadInt32(&currentRoutines)
 			if curR < maxRoutines {
 				atomic.AddInt32(&currentRoutines, 1)
-				go this.downloadFromAPI(fpath, conf, &currentRoutines)
+				go this.downloadFromAPI(fpath, fsize, conf, &currentRoutines)
 				break
 			} else {
 				<-time.After(time.Microsecond * 1)
@@ -157,13 +165,25 @@ func (this *UpyunBackup) BackupFiles(conf Conf, snapshotFile string) {
 	}
 }
 
-func (this *UpyunBackup) downloadFromAPI(fpath string, conf Conf, currentRoutines *int32) {
+func (this *UpyunBackup) downloadFromAPI(fpath string, fsize int64, conf Conf, currentRoutines *int32) {
 	defer func() {
 		atomic.AddInt32(currentRoutines, -1)
 		runtime.Gosched()
 	}()
-	fRemotePath := fmt.Sprintf("/%s%s", conf.Bucket, fpath)
 	fLocalPath := filepath.Join(conf.LocalDir, ".", fpath)
+	//check whether the local file exists and not changed, otherwise go ahead to download
+	fLocalStat, statErr := os.Stat(fLocalPath)
+	if statErr == nil && fLocalStat.Size() == fsize {
+		L.Debug("Local file `%s' exists and updated, go on to other files", fLocalPath)
+		return
+	}
+	fRemotePath := fmt.Sprintf("/%s%s", conf.Bucket, fpath)
+	//escape the remote path
+	fRemotePathParts := strings.Split(fRemotePath, "/")
+	for i := 0; i < len(fRemotePathParts); i++ {
+		fRemotePathParts[i] = UrlEncode(fRemotePathParts[i])
+	}
+	fRemotePath = strings.Join(fRemotePathParts, "/")
 	L.Debug("Downloading `%s' -> `%s'", fRemotePath, fLocalPath)
 
 	//mkdir if necessary
@@ -174,7 +194,7 @@ func (this *UpyunBackup) downloadFromAPI(fpath string, conf Conf, currentRoutine
 	}
 	locaPath := fLocalPath[:lastSlashIndex]
 	if mkdErr := os.MkdirAll(locaPath, 0775); mkdErr != nil {
-		L.Error("Failed to create local dir `%s' due to `%s'", locaPath, mkdErr)
+		L.Error("Failed to create local dir `%s' due to `%s'", locaPath, mkdErr.Error())
 		return
 	}
 
@@ -203,20 +223,26 @@ func (this *UpyunBackup) downloadFromAPI(fpath string, conf Conf, currentRoutine
 	req.Header("Date", reqDate)
 	resp, respErr := req.Response()
 	if respErr != nil {
-		L.Error("Get path `%s' files response failed due to `%s'", fRemotePath, respErr)
+		L.Error("Get path `%s' files response failed due to `%s'", fRemotePath, respErr.Error())
+		return
+	}
+	//check status code
+	if resp.StatusCode != 200 {
+		respData, _ := ioutil.ReadAll(resp.Body)
+		L.Error("Response for `%s' not ok `%s'", fRemotePath, string(respData))
 		return
 	}
 
 	//write data to local file
 	localFileH, openErr := os.OpenFile(fLocalPath, os.O_CREATE|os.O_WRONLY, 0666)
 	if openErr != nil {
-		L.Error("Open local file `%s' failed due to `%s'", fLocalPath, openErr)
+		L.Error("Open local file `%s' failed due to `%s'", fLocalPath, openErr.Error())
 		return
 	}
 	defer localFileH.Close()
 
 	_, wErr := io.Copy(localFileH, resp.Body)
 	if wErr != nil {
-		L.Error("Write local file `%s' failed due to `%s'", wErr)
+		L.Error("Write local file `%s' failed due to `%s'", wErr.Error())
 	}
 }
