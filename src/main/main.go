@@ -69,15 +69,16 @@ func main() {
 	//execute the command
 	cmdName := cmdArgs[1]
 	snapFile := cmdArgs[2]
+	bucketName := conf.Bucket
 
 	backuper := upyun.UpyunBackup{
 		Domain: domain,
 	}
 	switch strings.ToLower(cmdName) {
 	case "snapshot":
-		backuper.SnapshotFiles(conf, snapFile)
+		backuper.SnapshotFiles(bucketName, conf, snapFile)
 	case "backup":
-		backuper.BackupFiles(conf, snapFile)
+		backuper.BackupFiles(bucketName, conf, snapFile)
 	default:
 		upyun.L.Error("Unsupported command `%s'", cmdName)
 	}
