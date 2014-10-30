@@ -1,4 +1,4 @@
-export GOPATH=/Users/jemy/QiniuCloud/Projects/upyun-backup:$GOPATH
+export GOPATH=/Users/jemy/Upyun/upyun-backup:$GOPATH
 go build main
 go build main.go
 

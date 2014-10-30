@@ -19,13 +19,13 @@ const (
 var L *logs.BeeLogger
 
 type Conf struct {
-	User     string `json:"user"`
-	Password string `json:"password"`
-	Bucket   string `json:"bucket"`
-	LocalDir string `json:"localdir"`
-	Domain   int32  `json:"domain"`
-	Routine  int32  `json:"routine"`
-	Debug    bool   `json:"debug"`
+	User     string `json:"user"`     // operator name
+	Password string `json:"password"` // operator password
+	Bucket   string `json:"bucket"`   // bucket name
+	LocalDir string `json:"localdir"` // local directory, must exists
+	Domain   int32  `json:"domain"`   // upyun domain
+	Routine  int32  `json:"routine"`  // download routine count
+	Debug    bool   `json:"debug"`    // debug mode
 }
 
 func InitLogs(jsonConfig string, debugMode bool) {
