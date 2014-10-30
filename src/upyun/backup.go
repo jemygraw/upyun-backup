@@ -253,7 +253,7 @@ func (this *UpyunBackup) downloadFromAPI(fpath string, fsize int64, conf Conf, c
 	}
 
 	//mkdir if necessary
-	lastSlashIndex := strings.LastIndex(fLocalPath, "/")
+	lastSlashIndex := strings.LastIndex(fLocalPath, string(filepath.Separator))
 	if lastSlashIndex == -1 {
 		L.Error("Get local path failed for file `%s'", fLocalPath)
 		return
