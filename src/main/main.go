@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"strings"
+	"time"
 	"upyun"
 )
 
@@ -24,6 +26,7 @@ Build Version:
 }
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
 	cmdArgs := os.Args
 	if len(cmdArgs) != 3 {
 		help()
@@ -76,11 +79,18 @@ func main() {
 	backuper := upyun.UpyunBackup{
 		Domain: domain,
 	}
+	start := time.Now()
 	switch strings.ToLower(cmdName) {
 	case "snapshot":
+		upyun.L.Informational("Snapshot starts from `%s'", start.String())
 		backuper.SnapshotFiles(conf, snapFile)
+		upyun.L.Informational("Snapshot ends at `%s'", time.Now().String())
+		upyun.L.Informational("Snapshot lasts for `%s'", time.Since(start))
 	case "backup":
+		upyun.L.Informational("Backup starts from `%s'", start.String())
 		backuper.BackupFiles(conf, snapFile)
+		upyun.L.Informational("Backup ends at `%s'", time.Now().String())
+		upyun.L.Informational("Backup lasts for `%s'", time.Since(start))
 	default:
 		upyun.L.Error("Unsupported command `%s'", cmdName)
 	}
