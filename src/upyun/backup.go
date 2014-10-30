@@ -2,6 +2,7 @@ package upyun
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"github.com/astaxie/beego/httplib"
 	"io"
@@ -17,6 +18,56 @@ import (
 
 type UpyunBackup struct {
 	Domain string
+}
+
+type FileStat struct {
+	Type         string
+	Size         int64
+	LastModified int64
+}
+
+func (this *UpyunBackup) getFileStat(fRemotePath string, conf Conf) (fs FileStat, err error) {
+	reqDate := UpyunTime(time.Now())
+	reqSign := UpyunSign{
+		Method:   "HEAD",
+		Path:     fRemotePath,
+		Password: conf.Password,
+		Date:     reqDate,
+	}
+	reqToken := reqSign.Token()
+	reqAuth := UpyunAuth{
+		User:  conf.User,
+		Token: reqToken,
+	}
+
+	if this.Domain == "" {
+		this.Domain = DOMAIN_AUTO
+	}
+
+	reqUri := fmt.Sprintf("%s%s", this.Domain, fRemotePath)
+	req := httplib.Head(reqUri)
+	req.SetUserAgent("Go 1.1 package http")
+	req.Header("Authorization", reqAuth.ToString())
+	req.Header("Date", reqDate)
+	resp, respErr := req.Response()
+	if respErr != nil {
+		err = errors.New(fmt.Sprintf("Get file `%s' stat response failed due to `%s'", fRemotePath, respErr.Error()))
+		return
+	}
+	if resp.StatusCode != 200 {
+		err = errors.New(fmt.Sprintf("Get file `%s' stat failed due to `%s'", fRemotePath, resp.Status))
+		return
+	}
+
+	fType := resp.Header.Get("X-Upyun-File-Type")
+	fSize, _ := strconv.ParseInt(resp.Header.Get("X-Upyun-File-Size"), 10, 64)
+	fLastModified, _ := strconv.ParseInt(resp.Header.Get("X-Upyun-File-Date"), 10, 64)
+	fs = FileStat{
+		Type:         fType,
+		Size:         fSize,
+		LastModified: fLastModified,
+	}
+	return
 }
 
 func (this *UpyunBackup) SnapshotFiles(conf Conf, snapshotFile string) {
@@ -121,18 +172,20 @@ func (this *UpyunBackup) BackupFiles(conf Conf, snapshotFile string) {
 	for bReader.Scan() {
 		line := bReader.Text()
 		items := strings.Split(line, "\t")
-		if len(items) != 4 {
+		itemCount := len(items)
+		if itemCount != 4 && itemCount != 1 {
 			L.Error("Error parsing file content `%s'", line)
 			continue
-
 		}
 		fpath := items[0]
-		var fsize int64 = 0
+		var fsize int64 = -1
 		var pErr error
-		fsize, pErr = strconv.ParseInt(items[2], 10, 64)
-		if pErr != nil {
-			L.Error("Cannot parse file size for `%s'", fpath)
-			continue
+		if itemCount == 4 {
+			fsize, pErr = strconv.ParseInt(items[2], 10, 64)
+			if pErr != nil {
+				L.Error("Cannot parse file size for `%s'", fpath)
+				continue
+			}
 		}
 		if !strings.HasPrefix(fpath, "/") {
 			L.Error("Must specify the path, which starts with a `/', for file `%s'", fpath)
@@ -171,12 +224,6 @@ func (this *UpyunBackup) downloadFromAPI(fpath string, fsize int64, conf Conf, c
 		runtime.Gosched()
 	}()
 	fLocalPath := filepath.Join(conf.LocalDir, ".", fpath)
-	//check whether the local file exists and not changed, otherwise go ahead to download
-	fLocalStat, statErr := os.Stat(fLocalPath)
-	if statErr == nil && fLocalStat.Size() == fsize {
-		L.Debug("Local file `%s' exists and updated, go on to other files", fLocalPath)
-		return
-	}
 	fRemotePath := fmt.Sprintf("/%s%s", conf.Bucket, fpath)
 	//escape the remote path
 	fRemotePathParts := strings.Split(fRemotePath, "/")
@@ -184,7 +231,26 @@ func (this *UpyunBackup) downloadFromAPI(fpath string, fsize int64, conf Conf, c
 		fRemotePathParts[i] = UrlEncode(fRemotePathParts[i])
 	}
 	fRemotePath = strings.Join(fRemotePathParts, "/")
-	L.Debug("Downloading `%s' -> `%s'", fRemotePath, fLocalPath)
+
+	//check whether the local file exists and not changed, otherwise go ahead to download
+	fLocalStat, fLocalStatErr := os.Stat(fLocalPath)
+	if fLocalStatErr == nil {
+		// file exists
+		if fsize == -1 {
+			L.Debug("Check remote file stat for `%s'", fRemotePath)
+			//get file size from upyun server
+			fRemoteStat, fRemoteStatErr := this.getFileStat(fRemotePath, conf)
+			if fRemoteStatErr != nil {
+				L.Error("Remote stat `%s' error due to `%s'", fRemotePath, fRemoteStatErr.Error())
+				return
+			}
+			fsize = fRemoteStat.Size
+		}
+		if fLocalStat.Size() == fsize {
+			L.Debug("Local file `%s' exists and no changes, pass...", fLocalPath)
+			return
+		}
+	}
 
 	//mkdir if necessary
 	lastSlashIndex := strings.LastIndex(fLocalPath, "/")
@@ -232,7 +298,7 @@ func (this *UpyunBackup) downloadFromAPI(fpath string, fsize int64, conf Conf, c
 		L.Error("Response for `%s' not ok `%s'", fRemotePath, string(respData))
 		return
 	}
-
+	L.Debug("Downloading `%s' -> `%s'", fRemotePath, fLocalPath)
 	//write data to local file
 	localFileH, openErr := os.OpenFile(fLocalPath, os.O_CREATE|os.O_WRONLY, 0666)
 	if openErr != nil {

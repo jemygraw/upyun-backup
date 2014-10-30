@@ -14,7 +14,7 @@ type UpyunSign struct {
 }
 
 func (this *UpyunSign) ToString() string {
-	if this.Method == "GET" {
+	if this.Method == "GET" || this.Method == "HEAD" {
 		this.ContentLength = 0
 	}
 	buf := fmt.Sprintf("%s&%s&%s&%d&%s",
